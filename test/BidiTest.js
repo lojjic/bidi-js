@@ -1,8 +1,8 @@
-import { calculateBidiEmbeddingLevels } from '../src/bidi.js'
+import { getEmbeddingLevels, getReorderedIndices } from '../src/index.js'
 import { readFileSync } from 'fs'
 
-export function runBidiTest() {
-  const text = readFileSync(new URL('./BidiTest.txt', import.meta.url), 'utf-8');
+export function runBidiTest () {
+  const text = readFileSync(new URL('./BidiTest.txt', import.meta.url), 'utf-8')
   let lines = text.split('\n')
 
   const BAIL_COUNT = 10
@@ -39,6 +39,7 @@ export function runBidiTest() {
   }
 
   let expectedLevels
+  let expectedOrder
 
   let testCount = 0
   let passCount = 0
@@ -48,18 +49,19 @@ export function runBidiTest() {
     if (line && !line.startsWith('#')) {
       let match = line.match(/^@(Levels|Reorder):\s*(.*)$/)
       if (match) {
+        const values = match[2].trim() ? match[2].trim().split(/\s+/).map(s => s === 'x' ? s : parseInt(s, 10)) : []
         if (match[1] === 'Levels') {
-          expectedLevels = match[2].trim().split(/\s+/).map(s => s === 'x' ? s : parseInt(s, 10))
+          expectedLevels = values
+        } else if (match[1] === 'Reorder') {
+          expectedOrder = values
         }
         return
       }
 
-      let [input, paraDirs] = line.split(/\s*;\s*/)
+      let [types, paraDirs] = line.split(/\s*;\s*/)
 
-      const inputStr = input
-      input = input.trim().split(/\s+/)
-        .map(type => CLASS_REPS[type])
-        .join('')
+      types = types.trim().split(/\s+/)
+      const inputString = types.map(type => CLASS_REPS[type]).join('')
 
       paraDirs = parseInt(paraDirs.trim(), 10)
       paraDirs = paraDirBits.filter((dirString, i) => paraDirs & (1 << i))
@@ -67,13 +69,22 @@ export function runBidiTest() {
       for (let paraDir of paraDirs) {
         if (testFilter && testFilter(lineIdx + 1, paraDir) === false) continue
 
-        const levels = [...calculateBidiEmbeddingLevels(input, paraDir)]
+        const { levels, paragraphs } = getEmbeddingLevels(inputString, paraDir)
+        let reordered = getReorderedIndices(inputString, levels, paragraphs[0].start, paragraphs[0].end, paragraphs[0].level)
+        reordered = reordered.filter(i => expectedLevels[i] !== 'x') //those with indeterminate level are ommitted
 
-        // Replace 'x' placeholders for indeterminate levels so they don't trigger failures
-        let ok = expectedLevels.length === levels.length
+        let ok = expectedLevels.length === levels.length && paragraphs.length === 1
         if (ok) {
           for (let i = 0; i < expectedLevels.length; i++) {
             if (expectedLevels[i] !== 'x' && expectedLevels[i] !== levels[i]) {
+              ok = false
+              break
+            }
+          }
+        }
+        if (ok) {
+          for (let i = 0; i < reordered.length; i++) {
+            if (reordered[i] !== expectedOrder[i]) {
               ok = false
               break
             }
@@ -85,12 +96,15 @@ export function runBidiTest() {
           passCount++
         } else {
           if (failCount++ <= BAIL_COUNT) {
-            const msg = `Expected ${expectedLevels.join(' ')}, got ${levels.join(' ')}`
-            console.error(`Line ${lineIdx + 1}, input [${inputStr}], dir "${paraDir}": ${msg}`)
+            console.error(`Test on line ${lineIdx + 1}, direction "${paraDir}":
+  Input Types:     ${mapToColumns(types, 5)}
+  Expected levels: ${mapToColumns(expectedLevels, 5)}
+  Received levels: ${mapToColumns(levels, 5)}
+  Expected order:  ${mapToColumns(expectedOrder, 3)}
+  Received order:  ${mapToColumns(reordered, 3)}`)
           }
         }
       }
-
     }
   })
 
@@ -102,4 +116,8 @@ export function runBidiTest() {
   console.log(message)
 
   return failCount ? 1 : 0
+}
+
+function mapToColumns (values, colSize) {
+  return values.map(v => `${v}`.padEnd(colSize)).join('')
 }

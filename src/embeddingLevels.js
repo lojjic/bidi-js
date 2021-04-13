@@ -1,5 +1,13 @@
-import { TYPES, getBidiCharType, ISOLATE_INIT_TYPES, STRONG_TYPES, NEUTRAL_ISOLATE_TYPES } from './bidiCharTypes.js'
-import { closingToOpeningBracket, getCanonicalBracket, openingToClosingBracket } from './bidiBrackets.js'
+import {
+  BN_LIKE_TYPES,
+  getBidiCharType,
+  ISOLATE_INIT_TYPES,
+  NEUTRAL_ISOLATE_TYPES,
+  STRONG_TYPES,
+  TRAILING_TYPES,
+  TYPES
+} from './charTypes.js'
+import { closingToOpeningBracket, getCanonicalBracket, openingToClosingBracket } from './brackets.js'
 
 // Local type aliases
 const {
@@ -12,7 +20,6 @@ const {
   CS: TYPE_CS,
   B: TYPE_B,
   S: TYPE_S,
-  WS: TYPE_WS,
   ON: TYPE_ON,
   BN: TYPE_BN,
   NSM: TYPE_NSM,
@@ -28,171 +35,184 @@ const {
   PDI: TYPE_PDI
 } = TYPES
 
-export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
+/**
+ * This function applies the Bidirectional Algorithm to a string, returning the resolved embedding levels
+ * in a single Uint8Array plus a list of objects holding each paragraph's start and end indices and resolved
+ * base embedding level.
+ *
+ * @param {string} string - The input string
+ * @param {"ltr"|"rtl"|"auto"} [baseDirection] - Use "ltr" or "rtl" to force a base paragraph direction,
+ *        otherwise a direction will be chosen automatically from each paragraph's contents.
+ * @return {{paragraphs: {start, end, level}[], levels: Uint8Array}}
+ */
+export function getEmbeddingLevels (string, baseDirection) {
   const MAX_DEPTH = 125
 
   // Start by mapping all characters to their unicode type, as a bitmask integer
-  const charTypes = new Uint32Array(str.length) //consider storing just the bitshift as a uint8?
-  for (let i = 0; i < str.length; i++) {
-    charTypes[i] = getBidiCharType(str[i])
+  const charTypes = new Uint32Array(string.length)
+  for (let i = 0; i < string.length; i++) {
+    charTypes[i] = getBidiCharType(string[i])
   }
 
-  const embedLevels = new Uint8Array(str.length)
-
-  const nextEvenLevel = () => stackTop.level + ((stackTop.level & 1) ? 1 : 2)
-  const nextOddLevel = () => stackTop.level + ((stackTop.level & 1) ? 2 : 1)
-
+  const embedLevels = new Uint8Array(string.length)
   const isolationPairs = new Map() //init->pdi and pdi->init
 
+  // === 3.3.1 The Paragraph Level ===
+  // 3.3.1 P1: Split the text into paragraphs
   const paragraphs = [] // [{start, end, level}, ...]
-  const statusStack = [] // [{level: number, override: L|R|0, isolate: bool}, ...]
-  let stackTop
-  let overflowIsolateCount
-  let overflowEmbeddingCount
-  let validIsolateCount
-  const FORMATTING_TYPES = TYPE_RLE | TYPE_LRE | TYPE_RLO | TYPE_LRO | ISOLATE_INIT_TYPES | TYPE_PDI | TYPE_PDF | TYPE_B
-  for (let i = 0; i < str.length; i++) {
-    let charType = charTypes[i] | 0
-
-    // === 3.3.1 The Paragraph Level ===
-    if (!statusStack.length) {
-      const paraLevel = rootDirection === 'rtl' ? 1 : rootDirection === 'ltr' ? 0 : determineAutoEmbedLevel(i, false)
-      paragraphs.push({ start: i, end: str.length - 1, level: paraLevel })
-
-      // 3.3.2 X1
-      statusStack.push({
-        level: paraLevel,
-        override: 0, //0=neutral, 1=L, 2=R
-        isolate: 0 //bool
+  let currentPara = null
+  for (let i = 0; i < string.length; i++) {
+    if (!currentPara) {
+      paragraphs.push(currentPara = {
+        start: i,
+        end: string.length - 1,
+        // 3.3.1 P2-P3: Determine the paragraph level
+        level: baseDirection === 'rtl' ? 1 : baseDirection === 'ltr' ? 0 : determineAutoEmbedLevel(i, false)
       })
-      overflowIsolateCount = 0
-      overflowEmbeddingCount = 0
-      validIsolateCount = 0
     }
-
-    stackTop = statusStack[statusStack.length - 1] //for convenience
-
-    // === 3.3.2 Explicit Levels and Directions ===
-
-    if (charType & FORMATTING_TYPES) { //prefilter all formatters
-      // Explicit Embeddings: 3.3.2 X2 - X3
-      if (charType & (TYPE_RLE | TYPE_LRE)) {
-        embedLevels[i] = stackTop.level // 5.2
-        const level = charType === TYPE_RLE ? nextOddLevel() : nextEvenLevel()
-        if (level <= MAX_DEPTH && !overflowIsolateCount && !overflowEmbeddingCount) {
-          statusStack.push({
-            level,
-            override: 0,
-            isolate: 0
-          })
-        } else if (!overflowIsolateCount) {
-          overflowEmbeddingCount++
-        }
-      }
-
-      // Explicit Overrides: 3.3.2 X4 - X5
-      else if (charType & (TYPE_RLO | TYPE_LRO)) {
-        embedLevels[i] = stackTop.level // 5.2
-        const level = charType === TYPE_RLO ? nextOddLevel() : nextEvenLevel()
-        if (level <= MAX_DEPTH && !overflowIsolateCount && !overflowEmbeddingCount) {
-          statusStack.push({
-            level,
-            override: (charType & TYPE_RLO) ? TYPE_R : TYPE_L,
-            isolate: 0
-          })
-        } else if (!overflowIsolateCount) {
-          overflowEmbeddingCount++
-        }
-      }
-
-      // Isolates: 3.3.2 X5a - X5c
-      else if (charType & ISOLATE_INIT_TYPES) {
-        // X5c - FSI becomes either RLI or LRI
-        if (charType & TYPE_FSI) {
-          charType = determineAutoEmbedLevel(i + 1, true) === 1 ? TYPE_RLI : TYPE_LRI
-        }
-
-        embedLevels[i] = stackTop.level
-        if (stackTop.override) {
-          charTypes[i] = stackTop.override
-        }
-        const level = (charType & TYPE_RLI) ? nextOddLevel() : nextEvenLevel()
-        if (level <= MAX_DEPTH && overflowIsolateCount === 0 && overflowEmbeddingCount === 0) {
-          validIsolateCount++
-          statusStack.push({
-            level,
-            override: 0,
-            isolate: 1,
-            isolInitIndex: i
-          })
-        } else {
-          overflowIsolateCount++
-        }
-      }
-
-      // Terminating Isolates: 3.3.2 X6a
-      else if (charType & TYPE_PDI) {
-        if (overflowIsolateCount > 0) {
-          overflowIsolateCount--
-        } else if (validIsolateCount > 0) {
-          overflowEmbeddingCount = 0
-          while (!statusStack[statusStack.length - 1].isolate) {
-            statusStack.pop()
-          }
-          // Add to isolation pairs bidirectiona mapping:
-          const isolInitIndex = statusStack[statusStack.length - 1].isolInitIndex
-          if (isolInitIndex != null) {
-            isolationPairs.set(isolInitIndex, i)
-            isolationPairs.set(i, isolInitIndex)
-          }
-          statusStack.pop()
-          validIsolateCount--
-        }
-        stackTop = statusStack[statusStack.length - 1]
-        embedLevels[i] = stackTop.level
-        if (stackTop.override) {
-          charTypes[i] = stackTop.override
-        }
-      }
-
-
-      // Terminating Embeddings and Overrides: 3.3.2 X7
-      else if (charType & TYPE_PDF) {
-        if (overflowIsolateCount === 0) {
-          if (overflowEmbeddingCount > 0) {
-            overflowEmbeddingCount--
-          } else if (!stackTop.isolate && statusStack.length > 1) {
-            statusStack.pop()
-            stackTop = statusStack[statusStack.length - 1]
-          }
-        }
-        embedLevels[i] = stackTop.level // 5.2
-      }
-
-      // End of Paragraph: 3.3.2 X8
-      else if (charType & TYPE_B) {
-        embedLevels[i] = statusStack[0].level
-        paragraphs[paragraphs.length - 1].end = i
-      }
-    }
-
-    // Non-formatting characters: 3.3.2 X6
-    else {
-      embedLevels[i] = stackTop.level
-      // NOTE: This exclusion of BN seems to go against what section 5.2 says, but is required for test passage
-      if (stackTop.override && charType !== TYPE_BN) {
-        charTypes[i] = stackTop.override
-      }
+    if (charTypes[i] & TYPE_B) {
+      currentPara.end = i
+      currentPara = null
     }
   }
+
+  const FORMATTING_TYPES = TYPE_RLE | TYPE_LRE | TYPE_RLO | TYPE_LRO | ISOLATE_INIT_TYPES | TYPE_PDI | TYPE_PDF | TYPE_B
+  const nextEven = n => n + ((n & 1) ? 1 : 2)
+  const nextOdd = n => n + ((n & 1) ? 2 : 1)
 
   // Everything from here on will operate per paragraph.
   paragraphs.forEach(paragraph => {
+    const statusStack = [{
+      level: paragraph.level,
+      override: 0, //0=neutral, 1=L, 2=R
+      isolate: 0 //bool
+    }]
+    let stackTop
+    let overflowIsolateCount = 0
+    let overflowEmbeddingCount = 0
+    let validIsolateCount = 0
+
+    // === 3.3.2 Explicit Levels and Directions ===
+    for (let i = paragraph.start; i <= paragraph.end; i++) {
+      let charType = charTypes[i]
+      stackTop = statusStack[statusStack.length - 1]
+
+      // Explicit Embeddings: 3.3.2 X2 - X3
+      if (charType & FORMATTING_TYPES) { //prefilter all formatters
+        if (charType & (TYPE_RLE | TYPE_LRE)) {
+          embedLevels[i] = stackTop.level // 5.2
+          const level = (charType === TYPE_RLE ? nextOdd : nextEven)(stackTop.level)
+          if (level <= MAX_DEPTH && !overflowIsolateCount && !overflowEmbeddingCount) {
+            statusStack.push({
+              level,
+              override: 0,
+              isolate: 0
+            })
+          } else if (!overflowIsolateCount) {
+            overflowEmbeddingCount++
+          }
+        }
+
+        // Explicit Overrides: 3.3.2 X4 - X5
+        else if (charType & (TYPE_RLO | TYPE_LRO)) {
+          embedLevels[i] = stackTop.level // 5.2
+          const level = (charType === TYPE_RLO ? nextOdd : nextEven)(stackTop.level)
+          if (level <= MAX_DEPTH && !overflowIsolateCount && !overflowEmbeddingCount) {
+            statusStack.push({
+              level,
+              override: (charType & TYPE_RLO) ? TYPE_R : TYPE_L,
+              isolate: 0
+            })
+          } else if (!overflowIsolateCount) {
+            overflowEmbeddingCount++
+          }
+        }
+
+        // Isolates: 3.3.2 X5a - X5c
+        else if (charType & ISOLATE_INIT_TYPES) {
+          // X5c - FSI becomes either RLI or LRI
+          if (charType & TYPE_FSI) {
+            charType = determineAutoEmbedLevel(i + 1, true) === 1 ? TYPE_RLI : TYPE_LRI
+          }
+
+          embedLevels[i] = stackTop.level
+          if (stackTop.override) {
+            charTypes[i] = stackTop.override
+          }
+          const level = (charType === TYPE_RLI ? nextOdd : nextEven)(stackTop.level)
+          if (level <= MAX_DEPTH && overflowIsolateCount === 0 && overflowEmbeddingCount === 0) {
+            validIsolateCount++
+            statusStack.push({
+              level,
+              override: 0,
+              isolate: 1,
+              isolInitIndex: i
+            })
+          } else {
+            overflowIsolateCount++
+          }
+        }
+
+        // Terminating Isolates: 3.3.2 X6a
+        else if (charType & TYPE_PDI) {
+          if (overflowIsolateCount > 0) {
+            overflowIsolateCount--
+          } else if (validIsolateCount > 0) {
+            overflowEmbeddingCount = 0
+            while (!statusStack[statusStack.length - 1].isolate) {
+              statusStack.pop()
+            }
+            // Add to isolation pairs bidirectional mapping:
+            const isolInitIndex = statusStack[statusStack.length - 1].isolInitIndex
+            if (isolInitIndex != null) {
+              isolationPairs.set(isolInitIndex, i)
+              isolationPairs.set(i, isolInitIndex)
+            }
+            statusStack.pop()
+            validIsolateCount--
+          }
+          stackTop = statusStack[statusStack.length - 1]
+          embedLevels[i] = stackTop.level
+          if (stackTop.override) {
+            charTypes[i] = stackTop.override
+          }
+        }
+
+
+        // Terminating Embeddings and Overrides: 3.3.2 X7
+        else if (charType & TYPE_PDF) {
+          if (overflowIsolateCount === 0) {
+            if (overflowEmbeddingCount > 0) {
+              overflowEmbeddingCount--
+            } else if (!stackTop.isolate && statusStack.length > 1) {
+              statusStack.pop()
+              stackTop = statusStack[statusStack.length - 1]
+            }
+          }
+          embedLevels[i] = stackTop.level // 5.2
+        }
+
+        // End of Paragraph: 3.3.2 X8
+        else if (charType & TYPE_B) {
+          embedLevels[i] = paragraph.level
+        }
+      }
+
+      // Non-formatting characters: 3.3.2 X6
+      else {
+        embedLevels[i] = stackTop.level
+        // NOTE: This exclusion of BN seems to go against what section 5.2 says, but is required for test passage
+        if (stackTop.override && charType !== TYPE_BN) {
+          charTypes[i] = stackTop.override
+        }
+      }
+    }
+
     // === 3.3.3 Preparations for Implicit Processing ===
 
     // Remove all RLE, LRE, RLO, LRO, PDF, and BN characters: 3.3.3 X9
-    // Note: Due to section 5.2, we won't remove them, but this lets us easily ignore them all as a group from here on
-    const BN_LIKE_TYPES = TYPE_BN | TYPE_RLE | TYPE_LRE | TYPE_RLO | TYPE_LRO | TYPE_PDF
+    // Note: Due to section 5.2, we won't remove them, but we'll use the BN_LIKE_TYPES bitset to
+    // easily ignore them all from here on out.
 
     // 3.3.3 X10
     // Compute the set of isolating run sequences as specified by BD13
@@ -200,52 +220,32 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
     let currentRun = null
     let isolationLevel = 0
     for (let i = paragraph.start; i <= paragraph.end; i++) {
-      const lvl = embedLevels[i]
-      const charType = charTypes[i] | 0
-      const isIsolInit = charType & ISOLATE_INIT_TYPES
-      if (charType & BN_LIKE_TYPES) continue
-      const isPDI = charType === TYPE_PDI
-      if (isIsolInit) {
-        isolationLevel++
-      }
-      if (currentRun && lvl === currentRun.level) {
-        currentRun.end = i
-        currentRun.endsWithIsolInit = isIsolInit
-      } else {
-        levelRuns.push(currentRun = {
-          start: i,
-          end: i,
-          level: lvl,
-          startsWithPDI: isPDI,
-          endsWithIsolInit: isIsolInit
-        })
-      }
-      if (isPDI) {
-        isolationLevel--
-      }
-    }
-    // If any level run is composed of only ignored character types, remove it and merge those around it
-/*
-    for (let r = levelRuns.length; r--;) {
-      let hasNonIgnored = false
-      for (let i = levelRuns[r].start; i <= levelRuns[r].end; i++) {
-        if (!(charTypes[i] & BN_LIKE_TYPES)) {
-          hasNonIgnored = true
-          break
+      const charType = charTypes[i]
+      if (!(charType & BN_LIKE_TYPES)) {
+        const lvl = embedLevels[i]
+        const isIsolInit = charType & ISOLATE_INIT_TYPES
+        const isPDI = charType === TYPE_PDI
+        if (isIsolInit) {
+          isolationLevel++
         }
-      }
-      if (!hasNonIgnored) {
-        if (r > 0 && r < levelRuns.length - 1 && levelRuns[r - 1].level === levelRuns[r + 1].level) {
-          levelRuns[r - 1].end = levelRuns[r + 1].end
-          levelRuns[r - 1].endsWithIsolInit = levelRuns[r + 1].endsWithIsolInit
-          levelRuns.splice(r, 2)
+        if (currentRun && lvl === currentRun.level) {
+          currentRun.end = i
+          currentRun.endsWithIsolInit = isIsolInit
         } else {
-          levelRuns.splice(r, 1)
+          levelRuns.push(currentRun = {
+            start: i,
+            end: i,
+            level: lvl,
+            startsWithPDI: isPDI,
+            endsWithIsolInit: isIsolInit
+          })
+        }
+        if (isPDI) {
+          isolationLevel--
         }
       }
     }
-*/
-    const isolatingRunSeqs = [] // [{runs: [], sosType: L|R, eosType: L|R}]
+    const isolatingRunSeqs = [] // [{seqIndices: [], sosType: L|R, eosType: L|R}]
     for (let runIdx = 0; runIdx < levelRuns.length; runIdx++) {
       const run = levelRuns[runIdx]
       if (!run.startsWithPDI || (run.startsWithPDI && !isolationPairs.has(run.start))) {
@@ -346,7 +346,7 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
       // separator between two numbers of the same type changes to that type.
       for (let si = 1; si < seqIndices.length - 1; si++) {
         const i = seqIndices[si]
-        const type = charTypes[i] | 0
+        const type = charTypes[i]
         if (type & (TYPE_ES | TYPE_CS)) {
           let prevType = 0, nextType = 0
           for (let sj = si - 1; sj >= 0; sj--) {
@@ -427,12 +427,12 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
           // type, as that may have been changed earlier. This doesn't seem to be explicitly
           // called out in the spec, but is required for passage of certain tests.
           if (charTypes[seqIndices[si]] & NEUTRAL_ISOLATE_TYPES) {
-            const char = str[seqIndices[si]]
+            const char = string[seqIndices[si]]
             let oppositeBracket
             // Opening bracket
             if (openingToClosingBracket(char) !== null) {
               if (openerStack.length < 63) {
-                openerStack.push({char, seqIndex: si})
+                openerStack.push({ char, seqIndex: si })
               } else {
                 break
               }
@@ -503,7 +503,7 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
           if (useStrongType !== getEmbedDirection(seqIndices[openSeqIdx])) {
             for (let si = openSeqIdx + 1; si < seqIndices.length; si++) {
               if (!(charTypes[seqIndices[si]] & BN_LIKE_TYPES)) {
-                if (getBidiCharType(str[seqIndices[si]]) & TYPE_NSM) {
+                if (getBidiCharType(string[seqIndices[si]]) & TYPE_NSM) {
                   charTypes[seqIndices[si]] = useStrongType
                 }
                 break
@@ -513,7 +513,7 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
           if (useStrongType !== getEmbedDirection(seqIndices[closeSeqIdx])) {
             for (let si = closeSeqIdx + 1; si < seqIndices.length; si++) {
               if (!(charTypes[seqIndices[si]] & BN_LIKE_TYPES)) {
-                if (getBidiCharType(str[seqIndices[si]]) & TYPE_NSM) {
+                if (getBidiCharType(string[seqIndices[si]]) & TYPE_NSM) {
                   charTypes[seqIndices[si]] = useStrongType
                 }
                 break
@@ -555,25 +555,23 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
       }
     }
 
-
     // === 3.3.6 Resolving Implicit Levels ===
 
     for (let i = paragraph.start; i <= paragraph.end; i++) {
-      const level = embedLevels[i] | 0
-      const type = charTypes[i] | 0
+      const level = embedLevels[i]
+      const type = charTypes[i]
       // I2. For all characters with an odd (right-to-left) embedding level, those of type L, EN or AN go up one level.
       if (level & 1) {
         if (type & (TYPE_L | TYPE_EN | TYPE_AN)) {
           embedLevels[i]++
         }
       }
-      // I1. For all characters with an even (left-to-right) embedding level, those of type R go up one level
+        // I1. For all characters with an even (left-to-right) embedding level, those of type R go up one level
       // and those of type AN or EN go up two levels.
       else {
         if (type & TYPE_R) {
           embedLevels[i]++
-        }
-        else if (type & (TYPE_AN | TYPE_EN)) {
+        } else if (type & (TYPE_AN | TYPE_EN)) {
           embedLevels[i] += 2
         }
       }
@@ -584,15 +582,12 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
         embedLevels[i] = i === 0 ? paragraph.level : embedLevels[i - 1]
       }
 
-      // 3.4 L1: Reset the embedding level of certain characters (based on original type) to the paragraph embedding level
-      // NOTE: this will also need to be done per line *after* wrapping occurs
-      if (i === paragraph.end || (getBidiCharType(str[i]) & (TYPE_S | TYPE_B))) {
-        for (let i2 = i; i2 >= 0; i2--) {
-          if (getBidiCharType(str[i2]) & (TYPE_S | TYPE_WS | TYPE_B | ISOLATE_INIT_TYPES | TYPE_PDI | BN_LIKE_TYPES)) {
-            embedLevels[i2] = paragraph.level
-          } else {
-            break
-          }
+      // 3.4 L1.1-4: Reset the embedding level of segment/paragraph separators, and any sequence of whitespace or
+      // isolate formatting characters preceding them or the end of the paragraph, to the paragraph level.
+      // NOTE: this will also need to be applied to each individual line ending after line wrapping occurs.
+      if (i === paragraph.end || getBidiCharType(string[i]) & (TYPE_S | TYPE_B)) {
+        for (let j = i; j >= 0 && (getBidiCharType(string[j]) & TRAILING_TYPES); j--) {
+          embedLevels[j] = paragraph.level
         }
       }
     }
@@ -600,14 +595,15 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
 
   // DONE! The resolved levels can then be used, after line wrapping, to flip runs of characters
   // according to section 3.4 Reordering Resolved Levels
-  return embedLevels
-
-
+  return {
+    levels: embedLevels,
+    paragraphs
+  }
 
   function determineAutoEmbedLevel (start, isFSI) {
     // 3.3.1 P2 - P3
-    for (let i = start; i < str.length; i++) {
-      const charType = charTypes[i] | 0
+    for (let i = start; i < string.length; i++) {
+      const charType = charTypes[i]
       if (charType & (TYPE_R | TYPE_AL)) {
         return 1
       }
@@ -616,7 +612,7 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
       }
       if (charType & ISOLATE_INIT_TYPES) {
         const pdi = indexOfMatchingPDI(i)
-        i = pdi === -1 ? str.length : pdi
+        i = pdi === -1 ? string.length : pdi
       }
     }
     return 0
@@ -625,8 +621,8 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
   function indexOfMatchingPDI (isolateStart) {
     // 3.1.2 BD9
     let isolationLevel = 1
-    for (let i = isolateStart + 1; i < str.length; i++) {
-      const charType = charTypes[i] | 0
+    for (let i = isolateStart + 1; i < string.length; i++) {
+      const charType = charTypes[i]
       if (charType & TYPE_B) {
         break
       }
@@ -641,7 +637,7 @@ export function calculateBidiEmbeddingLevels (str, rootDirection='auto') {
     return -1
   }
 
-  function getEmbedDirection(i) {
+  function getEmbedDirection (i) {
     return (embedLevels[i] & 1) ? TYPE_R : TYPE_L
   }
 
