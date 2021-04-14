@@ -20,6 +20,7 @@ let map = null
 
 function parseData () {
   if (!map) {
+    //const start = performance.now()
     map = new Map()
     for (let type in DATA) {
       if (DATA.hasOwnProperty(type)) {
@@ -28,13 +29,14 @@ function parseData () {
           let [skip, step] = range.split('+')
           skip = parseInt(skip, 36)
           step = step ? parseInt(step, 36) : 0
-          map.set(String.fromCodePoint(lastCode += skip), TYPES[type])
+          map.set(lastCode += skip, TYPES[type])
           for (let i = 0; i < step; i++) {
-            map.set(String.fromCodePoint(++lastCode), TYPES[type])
+            map.set(++lastCode, TYPES[type])
           }
         })
       }
     }
+    //console.log(`char types parsed in ${performance.now() - start}ms`)
   }
 }
 
@@ -44,7 +46,7 @@ function parseData () {
  */
 function getBidiCharType (char) {
   parseData()
-  return map.get(char) || TYPES.L
+  return map.get(char.codePointAt(0)) || TYPES.L
 }
 
 export {

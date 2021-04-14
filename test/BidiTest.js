@@ -1,5 +1,6 @@
 import { getEmbeddingLevels, getReorderedIndices } from '../src/index.js'
 import { readFileSync } from 'fs'
+import { performance } from 'perf_hooks'
 
 export function runBidiTest () {
   const text = readFileSync(new URL('./BidiTest.txt', import.meta.url), 'utf-8')
@@ -44,6 +45,7 @@ export function runBidiTest () {
   let testCount = 0
   let passCount = 0
   let failCount = 0
+  let totalTime = 0
 
   lines.forEach((line, lineIdx) => {
     if (line && !line.startsWith('#')) {
@@ -69,8 +71,10 @@ export function runBidiTest () {
       for (let paraDir of paraDirs) {
         if (testFilter && testFilter(lineIdx + 1, paraDir) === false) continue
 
+        const start = performance.now()
         const { levels, paragraphs } = getEmbeddingLevels(inputString, paraDir)
         let reordered = getReorderedIndices(inputString, levels, paragraphs[0].start, paragraphs[0].end, paragraphs[0].level)
+        totalTime += performance.now() - start
         reordered = reordered.filter(i => expectedLevels[i] !== 'x') //those with indeterminate level are ommitted
 
         let ok = expectedLevels.length === levels.length && paragraphs.length === 1
@@ -112,6 +116,7 @@ export function runBidiTest () {
   if (failCount >= BAIL_COUNT) {
     message += ` (only first ${BAIL_COUNT} failures shown)`
   }
+  message += `\n    ${totalTime.toFixed(4)}ms total, ${(totalTime / testCount).toFixed(4)}ms average`
 
   console.log(message)
 

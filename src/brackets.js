@@ -5,6 +5,7 @@ const radix = 36
 
 function parse () {
   if (!openToClose) {
+    //const start = performance.now()
     function parseString (string, includeReverse) {
       let lastCode = 0
       const map = new Map()
@@ -23,6 +24,7 @@ function parse () {
     openToClose = map
     closeToOpen = reverseMap
     canonical = parseString(data.canonical, false).map
+    //console.log(`brackets parsed in ${performance.now() - start}ms`)
   }
 }
 
