@@ -49,8 +49,13 @@ function getBidiCharType (char) {
   return map.get(char.codePointAt(0)) || TYPES.L
 }
 
+function getBidiCharTypeName(char) {
+  return TYPES_TO_NAMES[getBidiCharType(char)]
+}
+
 export {
   getBidiCharType,
+  getBidiCharTypeName,
   TYPES,
   TYPES_TO_NAMES,
   ISOLATE_INIT_TYPES,
