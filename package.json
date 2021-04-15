@@ -3,6 +3,7 @@
   "version": "0.9.1",
   "description": "A JavaScript implementation of the Unicode Bidirectional Algorithm",
   "main": "dist/bidi.js",
+  "module": "dist/bidi.mjs",
   "type": "module",
   "scripts": {
     "build": "rollup -c rollup.config.js",
