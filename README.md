@@ -1,4 +1,4 @@
-# bidi.js
+# bidi-js
 
 This is a pure JavaScript implementation of the [Unicode Bidirectional Algorithm](https://www.unicode.org/reports/tr9/) version 13.0.0. Its goals, in no particular order, are to be:
 
