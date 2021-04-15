@@ -1,2 +1,5 @@
 export { getEmbeddingLevels } from './embeddingLevels.js'
-export { getReorderSegments, getReorderedIndices } from './reordering.js'
+export { getReorderSegments, getReorderedIndices, getReorderedString } from './reordering.js'
+export { TYPES, getBidiCharType, getBidiCharTypeName } from './charTypes.js'
+export { getMirroredCharacter, getMirroredCharactersMap } from './mirroring.js'
+export { closingToOpeningBracket, openingToClosingBracket, getCanonicalBracket } from './brackets.js'

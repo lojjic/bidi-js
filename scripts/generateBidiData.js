@@ -115,14 +115,6 @@ async function generateBracketsData() {
   })
 
   // Encode to strings
-  function encodeCodePointsMap(map) {
-    let lastCode = 0
-    return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([a, b]) => {
-      const str = `${(a - lastCode).toString(radix)}>${(b - a).toString(radix)}`
-      lastCode = b
-      return str
-    }).join(',')
-  }
   const out = {
     pairs: encodeCodePointsMap(pairs),
     canonical: encodeCodePointsMap(canonical)
@@ -137,6 +129,63 @@ export default ${JSON.stringify(out, null, 2)}
   console.log(`Wrote file ${filePath}, size ${fileContent.length}`)
 }
 
+async function generateMirroringData() {
+  // Build Map of opening to closing bracket codepoints
+  let response = await fetch('https://www.unicode.org/Public/13.0.0/ucd/BidiMirroring.txt')
+  let txt = await response.text()
+  let pairs = new Map()
+  let reversePairs = new Map()
+  txt.split('\n').forEach(line => {
+    line.trim()
+    if (!line || line.startsWith('#')) return
+    const match = line.match(/^([A-Z0-9.]+)\s*;\s*([A-Z0-9.]+)\s*/)
+    if (match) {
+      const a = parseInt(match[1], 16)
+      const b = parseInt(match[2], 16)
+      if (reversePairs.has(a) && reversePairs.get(a) !== b) {
+        console.warn(`mismatch: ${a} - ${b}`)
+      }
+      if (!reversePairs.has(a)) {
+        pairs.set(a, b)
+        reversePairs.set(b, a)
+      }
+    }
+  })
+
+  const out = encodeCodePointsMap(pairs)
+
+  const fileContent = `// Bidi mirrored chars data, auto generated
+export default ${JSON.stringify(out, null, 2)}
+`
+  const filePath = new URL('../src/data/bidiMirroring.data.js', import.meta.url)
+  writeFileSync(filePath, fileContent)
+
+  console.log(`Wrote file ${filePath}, size ${fileContent.length}`)
+
+}
+
+function encodeCodePointsMap(map) {
+  let lastCode = 0
+  let items = [...map.entries()].sort((a, b) => a[0] - b[0]).map(([a, b]) => {
+    const str = `${(a - lastCode).toString(radix)}>${(b - a).toString(radix)}`
+    lastCode = b
+    return str
+  })
+  // collapse repeated items into a "+n" entry
+  for (let i = 1; i < items.length; i++) {
+    if (items[i] === items[i - 1]) {
+      let reps = 1
+      for (let j = i + 1; j < items.length && (items[j] === items[i]); j++) {
+        reps++
+      }
+      items.splice(i, reps, `+${reps}`)
+    }
+  }
+  return items.join(',')
+}
+
+
 
 generateBidiCharTypesData()
 generateBracketsData()
+generateMirroringData()

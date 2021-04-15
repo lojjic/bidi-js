@@ -1,44 +1,30 @@
 import data from './data/bidiBrackets.data.js'
+import { parseCharacterMap } from './util/parseCharacterMap.js'
 
 let openToClose, closeToOpen, canonical
-const radix = 36
 
 function parse () {
   if (!openToClose) {
     //const start = performance.now()
-    function parseString (string, includeReverse) {
-      let lastCode = 0
-      const map = new Map()
-      const reverseMap = includeReverse && new Map()
-      string.split(',').forEach(pair => {
-        let [a, b] = pair.split('>')
-        a = String.fromCodePoint(lastCode += parseInt(a, radix))
-        b = String.fromCodePoint(lastCode += parseInt(b, radix))
-        map.set(a, b)
-        includeReverse && reverseMap.set(b, a)
-      })
-      return { map, reverseMap }
-    }
-
-    let { map, reverseMap } = parseString(data.pairs, true)
+    let { map, reverseMap } = parseCharacterMap(data.pairs, true)
     openToClose = map
     closeToOpen = reverseMap
-    canonical = parseString(data.canonical, false).map
+    canonical = parseCharacterMap(data.canonical, false).map
     //console.log(`brackets parsed in ${performance.now() - start}ms`)
   }
 }
 
-export function openingToClosingBracket (ch) {
+export function openingToClosingBracket (char) {
   parse()
-  return openToClose.get(ch) || null
+  return openToClose.get(char) || null
 }
 
-export function closingToOpeningBracket (ch) {
+export function closingToOpeningBracket (char) {
   parse()
-  return closeToOpen.get(ch) || null
+  return closeToOpen.get(char) || null
 }
 
-export function getCanonicalBracket (ch) {
+export function getCanonicalBracket (char) {
   parse()
-  return canonical.get(ch) || null
+  return canonical.get(char) || null
 }

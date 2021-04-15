@@ -3,20 +3,21 @@ import { getBidiCharType, TRAILING_TYPES } from './charTypes.js'
 /**
  * Given a start and end denoting a single line within a string, and a set of precalculated
  * bidi embedding levels, produce a list of segments whose ordering should be flipped, in sequence.
- * @param {string} string
- * @param {Uint8Array} embedLevels
- * @param {number} lineStart
- * @param {number} lineEnd
- * @param {number} paragraphLevel
+ * @param {string} string - the full input string
+ * @param {Uint8Array} embedLevels - the `levels` result from calling getEmbeddingLevels on the full string
+ * @param {number} start - first character in the segment being reordered
+ * @param {number} end - last character in the segment being reordered
+ * @param {number} paragraphLevel - the paragraph level, this can be found in `paragraphs` from calling getEmbeddingLevels
+ * @return {Array<[start, end]>} - the list of start/end segments that should be flipped, in order.
  */
-export function getReorderSegments(string, embedLevels, lineStart, lineEnd, paragraphLevel) {
+export function getReorderSegments(string, embedLevels, start, end, paragraphLevel) {
   // Local slice for mutation
-  const lineLevels = embedLevels.slice(lineStart, lineEnd + 1)
+  const lineLevels = embedLevels.slice(start, end + 1)
 
   // 3.4 L1.4: Reset any sequence of whitespace characters and/or isolate formatting characters at the
   // end of the line to the paragraph level.
-  for (let i = lineEnd; i >= lineStart && (getBidiCharType(string[i]) & TRAILING_TYPES); i--) {
-    lineLevels[i - lineStart] = paragraphLevel
+  for (let i = end; i >= start && (getBidiCharType(string[i]) & TRAILING_TYPES); i--) {
+    lineLevels[i - start] = paragraphLevel
   }
 
   // L2. From the highest level found in the text to the lowest odd level on each line, including intermediate levels
@@ -36,7 +37,9 @@ export function getReorderSegments(string, embedLevels, lineStart, lineEnd, para
         while (i + 1 < lineLevels.length && lineLevels[i + 1] >= lvl) {
           i++
         }
-        segments.push([segStart + lineStart, i + lineStart])
+        if (i > segStart) {
+          segments.push([segStart + start, i + start])
+        }
       }
     }
   }
@@ -46,13 +49,13 @@ export function getReorderSegments(string, embedLevels, lineStart, lineEnd, para
 /**
  * @param {string} string
  * @param {Uint8Array} embedLevels
- * @param {number} lineStart
- * @param {number} lineEnd
+ * @param {number} start
+ * @param {number} end
  * @param {number} paragraphLevel
  * @return {string} the new string with bidi segments reordered
  */
-export function getReorderedString(string, embedLevels, lineStart, lineEnd, paragraphLevel) {
-  const indices = getReorderedIndices(string, embedLevels, lineStart, lineEnd, paragraphLevel)
+export function getReorderedString(string, embedLevels, start, end, paragraphLevel) {
+  const indices = getReorderedIndices(string, embedLevels, start, end, paragraphLevel)
   const chars = []
   indices.forEach((charIndex, i) => {
     chars[i] = string[charIndex]
@@ -63,13 +66,13 @@ export function getReorderedString(string, embedLevels, lineStart, lineEnd, para
 /**
  * @param {string} string
  * @param {Uint8Array} embedLevels
- * @param {number} lineStart
- * @param {number} lineEnd
+ * @param {number} start
+ * @param {number} end
  * @param {number} paragraphLevel
  * @return {number[]} an array with character indices in their new bidi order
  */
-export function getReorderedIndices(string, embedLevels, lineStart, lineEnd, paragraphLevel) {
-  const segments = getReorderSegments(string, embedLevels, lineStart, lineEnd, paragraphLevel)
+export function getReorderedIndices(string, embedLevels, start, end, paragraphLevel) {
+  const segments = getReorderSegments(string, embedLevels, start, end, paragraphLevel)
   // Fill an array with indices
   const indices = []
   for (let i = 0; i < string.length; i++) {
