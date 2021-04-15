@@ -72,8 +72,9 @@ export function runBidiTest () {
         if (testFilter && testFilter(lineIdx + 1, paraDir) === false) continue
 
         const start = performance.now()
-        const { levels, paragraphs } = getEmbeddingLevels(inputString, paraDir)
-        let reordered = getReorderedIndices(inputString, levels, paragraphs[0].start, paragraphs[0].end, paragraphs[0].level)
+        const embedLevelsResult = getEmbeddingLevels(inputString, paraDir)
+        const {levels, paragraphs} = embedLevelsResult
+        let reordered = getReorderedIndices(inputString, embedLevelsResult)
         totalTime += performance.now() - start
         reordered = reordered.filter(i => expectedLevels[i] !== 'x') //those with indeterminate level are ommitted
 
@@ -124,5 +125,5 @@ export function runBidiTest () {
 }
 
 function mapToColumns (values, colSize) {
-  return values.map(v => `${v}`.padEnd(colSize)).join('')
+  return [...values].map(v => `${v}`.padEnd(colSize)).join('')
 }

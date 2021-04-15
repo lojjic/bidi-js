@@ -30,7 +30,11 @@ export function getMirroredCharacter (char) {
  * @param [end]
  * @return {Map<number, string>}
  */
-export function getMirroredCharactersMap(string, embeddingLevels, start=0, end=string.length - 1) {
+export function getMirroredCharactersMap(string, embeddingLevels, start, end) {
+  let strLen = string.length
+  start = Math.max(0, start == null ? 0 : +start)
+  end = Math.min(strLen - 1, end == null ? strLen - 1 : +end)
+
   const map = new Map()
   for (let i = start; i <= end; i++) {
     if (embeddingLevels[i] & 1) { //only odd (rtl) levels

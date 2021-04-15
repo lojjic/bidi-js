@@ -36,6 +36,12 @@ const {
 } = TYPES
 
 /**
+ * @typedef {object} GetEmbeddingLevelsResult
+ * @property {{start, end, level}[]} paragraphs
+ * @property {Uint8Array} levels
+ */
+
+/**
  * This function applies the Bidirectional Algorithm to a string, returning the resolved embedding levels
  * in a single Uint8Array plus a list of objects holding each paragraph's start and end indices and resolved
  * base embedding level.
@@ -43,7 +49,7 @@ const {
  * @param {string} string - The input string
  * @param {"ltr"|"rtl"|"auto"} [baseDirection] - Use "ltr" or "rtl" to force a base paragraph direction,
  *        otherwise a direction will be chosen automatically from each paragraph's contents.
- * @return {{paragraphs: {start, end, level}[], levels: Uint8Array}}
+ * @return {GetEmbeddingLevelsResult}
  */
 export function getEmbeddingLevels (string, baseDirection) {
   const MAX_DEPTH = 125
