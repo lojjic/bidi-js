@@ -23,6 +23,8 @@ Install it from npm:
 npm install bidi-js
 ```
 
+[![NPM](https://nodei.co/npm/bidi-js.png?compact=true)](https://npmjs.org/package/bidi-js)
+
 Import and initialize:
 
 ```js
