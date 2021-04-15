@@ -15,7 +15,7 @@ export default {
       plugins: [
         terser({
           ecma: 5,
-          //mangle: { properties: true }
+          mangle: {properties: {regex: /^_/}}
         })
       ]
     }

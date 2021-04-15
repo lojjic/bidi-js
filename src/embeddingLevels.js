@@ -98,9 +98,9 @@ export function getEmbeddingLevels (string, baseDirection) {
   for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
     paragraph = paragraphs[paraIdx]
     const statusStack = [{
-      level: paragraph.level,
-      override: 0, //0=neutral, 1=L, 2=R
-      isolate: 0 //bool
+      _level: paragraph.level,
+      _override: 0, //0=neutral, 1=L, 2=R
+      _isolate: 0 //bool
     }]
     let stackTop
     let overflowIsolateCount = 0
@@ -122,13 +122,13 @@ export function getEmbeddingLevels (string, baseDirection) {
       // Explicit Embeddings: 3.3.2 X2 - X3
       if (charType & FORMATTING_TYPES) { //prefilter all formatters
         if (charType & (TYPE_RLE | TYPE_LRE)) {
-          embedLevels[i] = stackTop.level // 5.2
-          const level = (charType === TYPE_RLE ? nextOdd : nextEven)(stackTop.level)
+          embedLevels[i] = stackTop._level // 5.2
+          const level = (charType === TYPE_RLE ? nextOdd : nextEven)(stackTop._level)
           if (level <= MAX_DEPTH && !overflowIsolateCount && !overflowEmbeddingCount) {
             statusStack.push({
-              level,
-              override: 0,
-              isolate: 0
+              _level: level,
+              _override: 0,
+              _isolate: 0
             })
           } else if (!overflowIsolateCount) {
             overflowEmbeddingCount++
@@ -137,13 +137,13 @@ export function getEmbeddingLevels (string, baseDirection) {
 
         // Explicit Overrides: 3.3.2 X4 - X5
         else if (charType & (TYPE_RLO | TYPE_LRO)) {
-          embedLevels[i] = stackTop.level // 5.2
-          const level = (charType === TYPE_RLO ? nextOdd : nextEven)(stackTop.level)
+          embedLevels[i] = stackTop._level // 5.2
+          const level = (charType === TYPE_RLO ? nextOdd : nextEven)(stackTop._level)
           if (level <= MAX_DEPTH && !overflowIsolateCount && !overflowEmbeddingCount) {
             statusStack.push({
-              level,
-              override: (charType & TYPE_RLO) ? TYPE_R : TYPE_L,
-              isolate: 0
+              _level: level,
+              _override: (charType & TYPE_RLO) ? TYPE_R : TYPE_L,
+              _isolate: 0
             })
           } else if (!overflowIsolateCount) {
             overflowEmbeddingCount++
@@ -157,18 +157,18 @@ export function getEmbeddingLevels (string, baseDirection) {
             charType = determineAutoEmbedLevel(i + 1, true) === 1 ? TYPE_RLI : TYPE_LRI
           }
 
-          embedLevels[i] = stackTop.level
-          if (stackTop.override) {
-            changeCharType(i, stackTop.override)
+          embedLevels[i] = stackTop._level
+          if (stackTop._override) {
+            changeCharType(i, stackTop._override)
           }
-          const level = (charType === TYPE_RLI ? nextOdd : nextEven)(stackTop.level)
+          const level = (charType === TYPE_RLI ? nextOdd : nextEven)(stackTop._level)
           if (level <= MAX_DEPTH && overflowIsolateCount === 0 && overflowEmbeddingCount === 0) {
             validIsolateCount++
             statusStack.push({
-              level,
-              override: 0,
-              isolate: 1,
-              isolInitIndex: i
+              _level: level,
+              _override: 0,
+              _isolate: 1,
+              _isolInitIndex: i
             })
           } else {
             overflowIsolateCount++
@@ -181,11 +181,11 @@ export function getEmbeddingLevels (string, baseDirection) {
             overflowIsolateCount--
           } else if (validIsolateCount > 0) {
             overflowEmbeddingCount = 0
-            while (!statusStack[statusStack.length - 1].isolate) {
+            while (!statusStack[statusStack.length - 1]._isolate) {
               statusStack.pop()
             }
             // Add to isolation pairs bidirectional mapping:
-            const isolInitIndex = statusStack[statusStack.length - 1].isolInitIndex
+            const isolInitIndex = statusStack[statusStack.length - 1]._isolInitIndex
             if (isolInitIndex != null) {
               isolationPairs.set(isolInitIndex, i)
               isolationPairs.set(i, isolInitIndex)
@@ -194,9 +194,9 @@ export function getEmbeddingLevels (string, baseDirection) {
             validIsolateCount--
           }
           stackTop = statusStack[statusStack.length - 1]
-          embedLevels[i] = stackTop.level
-          if (stackTop.override) {
-            changeCharType(i, stackTop.override)
+          embedLevels[i] = stackTop._level
+          if (stackTop._override) {
+            changeCharType(i, stackTop._override)
           }
         }
 
@@ -206,12 +206,12 @@ export function getEmbeddingLevels (string, baseDirection) {
           if (overflowIsolateCount === 0) {
             if (overflowEmbeddingCount > 0) {
               overflowEmbeddingCount--
-            } else if (!stackTop.isolate && statusStack.length > 1) {
+            } else if (!stackTop._isolate && statusStack.length > 1) {
               statusStack.pop()
               stackTop = statusStack[statusStack.length - 1]
             }
           }
-          embedLevels[i] = stackTop.level // 5.2
+          embedLevels[i] = stackTop._level // 5.2
         }
 
         // End of Paragraph: 3.3.2 X8
@@ -222,10 +222,10 @@ export function getEmbeddingLevels (string, baseDirection) {
 
       // Non-formatting characters: 3.3.2 X6
       else {
-        embedLevels[i] = stackTop.level
+        embedLevels[i] = stackTop._level
         // NOTE: This exclusion of BN seems to go against what section 5.2 says, but is required for test passage
-        if (stackTop.override && charType !== TYPE_BN) {
-          changeCharType(i, stackTop.override)
+        if (stackTop._override && charType !== TYPE_BN) {
+          changeCharType(i, stackTop._override)
         }
       }
     }
@@ -250,16 +250,16 @@ export function getEmbeddingLevels (string, baseDirection) {
         if (isIsolInit) {
           isolationLevel++
         }
-        if (currentRun && lvl === currentRun.level) {
-          currentRun.end = i
-          currentRun.endsWithIsolInit = isIsolInit
+        if (currentRun && lvl === currentRun._level) {
+          currentRun._end = i
+          currentRun._endsWithIsolInit = isIsolInit
         } else {
           levelRuns.push(currentRun = {
-            start: i,
-            end: i,
-            level: lvl,
-            startsWithPDI: isPDI,
-            endsWithIsolInit: isIsolInit
+            _start: i,
+            _end: i,
+            _level: lvl,
+            _startsWithPDI: isPDI,
+            _endsWithIsolInit: isIsolInit
           })
         }
         if (isPDI) {
@@ -270,11 +270,11 @@ export function getEmbeddingLevels (string, baseDirection) {
     const isolatingRunSeqs = [] // [{seqIndices: [], sosType: L|R, eosType: L|R}]
     for (let runIdx = 0; runIdx < levelRuns.length; runIdx++) {
       const run = levelRuns[runIdx]
-      if (!run.startsWithPDI || (run.startsWithPDI && !isolationPairs.has(run.start))) {
+      if (!run._startsWithPDI || (run._startsWithPDI && !isolationPairs.has(run._start))) {
         const seqRuns = [currentRun = run]
-        for (let pdiIndex; currentRun && currentRun.endsWithIsolInit && (pdiIndex = isolationPairs.get(currentRun.end)) != null;) {
+        for (let pdiIndex; currentRun && currentRun._endsWithIsolInit && (pdiIndex = isolationPairs.get(currentRun._end)) != null;) {
           for (let i = runIdx + 1; i < levelRuns.length; i++) {
-            if (levelRuns[i].start === pdiIndex) {
+            if (levelRuns[i]._start === pdiIndex) {
               seqRuns.push(currentRun = levelRuns[i])
               break
             }
@@ -284,7 +284,7 @@ export function getEmbeddingLevels (string, baseDirection) {
         const seqIndices = []
         for (let i = 0; i < seqRuns.length; i++) {
           const run = seqRuns[i]
-          for (let j = run.start; j <= run.end; j++) {
+          for (let j = run._start; j <= run._end; j++) {
             seqIndices.push(j)
           }
         }
@@ -309,16 +309,16 @@ export function getEmbeddingLevels (string, baseDirection) {
           }
         }
         isolatingRunSeqs.push({
-          seqIndices,
-          sosType: Math.max(prevLevel, firstLevel) % 2 ? TYPE_R : TYPE_L,
-          eosType: Math.max(nextLevel, lastLevel) % 2 ? TYPE_R : TYPE_L
+          _seqIndices: seqIndices,
+          _sosType: Math.max(prevLevel, firstLevel) % 2 ? TYPE_R : TYPE_L,
+          _eosType: Math.max(nextLevel, lastLevel) % 2 ? TYPE_R : TYPE_L
         })
       }
     }
 
     // The next steps are done per isolating run sequence
     for (let seqIdx = 0; seqIdx < isolatingRunSeqs.length; seqIdx++) {
-      const { seqIndices, sosType, eosType } = isolatingRunSeqs[seqIdx]
+      const { _seqIndices: seqIndices, _sosType: sosType, _eosType: eosType } = isolatingRunSeqs[seqIdx]
 
       // === 3.3.4 Resolving Weak Types ===
 
