@@ -54,16 +54,30 @@ export function getEmbeddingLevels (string, baseDirection) {
     charTypes[i] = getBidiCharType(string[i])
   }
 
+  const charTypeCounts = new Map() //will be cleared at start of each paragraph
+  function changeCharType(i, type) {
+    const oldType = charTypes[i]
+    charTypes[i] = type
+    charTypeCounts.set(oldType, charTypeCounts.get(oldType) - 1)
+    if (oldType & NEUTRAL_ISOLATE_TYPES) {
+      charTypeCounts.set(NEUTRAL_ISOLATE_TYPES, charTypeCounts.get(NEUTRAL_ISOLATE_TYPES) - 1)
+    }
+    charTypeCounts.set(type, (charTypeCounts.get(type) || 0) + 1)
+    if (type & NEUTRAL_ISOLATE_TYPES) {
+      charTypeCounts.set(NEUTRAL_ISOLATE_TYPES, (charTypeCounts.get(NEUTRAL_ISOLATE_TYPES) || 0) + 1)
+    }
+  }
+
   const embedLevels = new Uint8Array(string.length)
   const isolationPairs = new Map() //init->pdi and pdi->init
 
   // === 3.3.1 The Paragraph Level ===
   // 3.3.1 P1: Split the text into paragraphs
   const paragraphs = [] // [{start, end, level}, ...]
-  let currentPara = null
+  let paragraph = null
   for (let i = 0; i < string.length; i++) {
-    if (!currentPara) {
-      paragraphs.push(currentPara = {
+    if (!paragraph) {
+      paragraphs.push(paragraph = {
         start: i,
         end: string.length - 1,
         // 3.3.1 P2-P3: Determine the paragraph level
@@ -71,8 +85,8 @@ export function getEmbeddingLevels (string, baseDirection) {
       })
     }
     if (charTypes[i] & TYPE_B) {
-      currentPara.end = i
-      currentPara = null
+      paragraph.end = i
+      paragraph = null
     }
   }
 
@@ -81,7 +95,8 @@ export function getEmbeddingLevels (string, baseDirection) {
   const nextOdd = n => n + ((n & 1) ? 2 : 1)
 
   // Everything from here on will operate per paragraph.
-  paragraphs.forEach(paragraph => {
+  for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
+    paragraph = paragraphs[paraIdx]
     const statusStack = [{
       level: paragraph.level,
       override: 0, //0=neutral, 1=L, 2=R
@@ -91,20 +106,7 @@ export function getEmbeddingLevels (string, baseDirection) {
     let overflowIsolateCount = 0
     let overflowEmbeddingCount = 0
     let validIsolateCount = 0
-
-    const charTypeCounts = {}
-    function changeCharType(i, type) {
-      const oldType = charTypes[i]
-      charTypes[i] = type
-      charTypeCounts[oldType]--
-      if (oldType & NEUTRAL_ISOLATE_TYPES) {
-        charTypeCounts[NEUTRAL_ISOLATE_TYPES]--
-      }
-      charTypeCounts[type] = (charTypeCounts[type] || 0) + 1
-      if (type & NEUTRAL_ISOLATE_TYPES) {
-        charTypeCounts[NEUTRAL_ISOLATE_TYPES] = (charTypeCounts[NEUTRAL_ISOLATE_TYPES] || 0) + 1
-      }
-    }
+    charTypeCounts.clear()
 
     // === 3.3.2 Explicit Levels and Directions ===
     for (let i = paragraph.start; i <= paragraph.end; i++) {
@@ -112,9 +114,9 @@ export function getEmbeddingLevels (string, baseDirection) {
       stackTop = statusStack[statusStack.length - 1]
 
       // Set initial counts
-      charTypeCounts[charType] = (charTypeCounts[charType] || 0) + 1
+      charTypeCounts.set(charType, (charTypeCounts.get(charType) || 0) + 1)
       if (charType & NEUTRAL_ISOLATE_TYPES) {
-        charTypeCounts[NEUTRAL_ISOLATE_TYPES] = (charTypeCounts[NEUTRAL_ISOLATE_TYPES] || 0) + 1
+        charTypeCounts.set(NEUTRAL_ISOLATE_TYPES, (charTypeCounts.get(NEUTRAL_ISOLATE_TYPES) || 0) + 1)
       }
 
       // Explicit Embeddings: 3.3.2 X2 - X3
@@ -323,7 +325,7 @@ export function getEmbeddingLevels (string, baseDirection) {
       // W1 + 5.2. Search backward from each NSM to the first character in the isolating run sequence whose
       // bidirectional type is not BN, and set the NSM to ON if it is an isolate initiator or PDI, and to its
       // type otherwise. If the NSM is the first non-BN character, change the NSM to the type of sos.
-      if (charTypeCounts[TYPE_NSM]) {
+      if (charTypeCounts.get(TYPE_NSM)) {
         for (let si = 0; si < seqIndices.length; si++) {
           const i = seqIndices[si]
           if (charTypes[i] & TYPE_NSM) {
@@ -341,7 +343,7 @@ export function getEmbeddingLevels (string, baseDirection) {
 
       // W2. Search backward from each instance of a European number until the first strong type (R, L, AL, or sos)
       // is found. If an AL is found, change the type of the European number to Arabic number.
-      if (charTypeCounts[TYPE_EN]) {
+      if (charTypeCounts.get(TYPE_EN)) {
         for (let si = 0; si < seqIndices.length; si++) {
           const i = seqIndices[si]
           if (charTypes[i] & TYPE_EN) {
@@ -359,7 +361,7 @@ export function getEmbeddingLevels (string, baseDirection) {
       }
 
       // W3. Change all ALs to R
-      if (charTypeCounts[TYPE_AL]) {
+      if (charTypeCounts.get(TYPE_AL)) {
         for (let si = 0; si < seqIndices.length; si++) {
           const i = seqIndices[si]
           if (charTypes[i] & TYPE_AL) {
@@ -370,7 +372,7 @@ export function getEmbeddingLevels (string, baseDirection) {
 
       // W4. A single European separator between two European numbers changes to a European number. A single common
       // separator between two numbers of the same type changes to that type.
-      if (charTypeCounts[TYPE_ES] || charTypeCounts[TYPE_CS]) {
+      if (charTypeCounts.get(TYPE_ES) || charTypeCounts.get(TYPE_CS)) {
         for (let si = 1; si < seqIndices.length - 1; si++) {
           const i = seqIndices[si]
           if (charTypes[i] & (TYPE_ES | TYPE_CS)) {
@@ -395,7 +397,7 @@ export function getEmbeddingLevels (string, baseDirection) {
       }
 
       // W5. A sequence of European terminators adjacent to European numbers changes to all European numbers.
-      if (charTypeCounts[TYPE_EN]) {
+      if (charTypeCounts.get(TYPE_EN)) {
         for (let si = 0; si < seqIndices.length; si++) {
           const i = seqIndices[si]
           if (charTypes[i] & TYPE_EN) {
@@ -410,7 +412,7 @@ export function getEmbeddingLevels (string, baseDirection) {
       }
 
       // W6. Otherwise, separators and terminators change to Other Neutral.
-      if (charTypeCounts[TYPE_ET] || charTypeCounts[TYPE_ES] || charTypeCounts[TYPE_CS]) {
+      if (charTypeCounts.get(TYPE_ET) || charTypeCounts.get(TYPE_ES) || charTypeCounts.get(TYPE_CS)) {
         for (let si = 0; si < seqIndices.length; si++) {
           const i = seqIndices[si]
           if (charTypes[i] & (TYPE_ET | TYPE_ES | TYPE_CS)) {
@@ -429,7 +431,7 @@ export function getEmbeddingLevels (string, baseDirection) {
       // W7. Search backward from each instance of a European number until the first strong type (R, L, or sos)
       // is found. If an L is found, then change the type of the European number to L.
       // NOTE: implemented in single forward pass for efficiency
-      if (charTypeCounts[TYPE_EN]) {
+      if (charTypeCounts.get(TYPE_EN)) {
         for (let si = 0, prevStrongType = sosType; si < seqIndices.length; si++) {
           const i = seqIndices[si]
           const type = charTypes[i]
@@ -445,7 +447,7 @@ export function getEmbeddingLevels (string, baseDirection) {
 
       // === 3.3.5 Resolving Neutral and Isolate Formatting Types ===
 
-      if (charTypeCounts[NEUTRAL_ISOLATE_TYPES]) {
+      if (charTypeCounts.get(NEUTRAL_ISOLATE_TYPES)) {
         // N0. Process bracket pairs in an isolating run sequence sequentially in the logical order of the text
         // positions of the opening paired brackets using the logic given below. Within this scope, bidirectional
         // types EN and AN are treated as R.
@@ -626,7 +628,7 @@ export function getEmbeddingLevels (string, baseDirection) {
         }
       }
     }
-  })
+  }
 
   // DONE! The resolved levels can then be used, after line wrapping, to flip runs of characters
   // according to section 3.4 Reordering Resolved Levels
