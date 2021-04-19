@@ -53,7 +53,7 @@ const { levels, paragraphs } = embeddingLevels
 
 The result object `embeddingLevels` will usually be passed to other functions described below. Its contents, should you need to inspect them individually, are:
 
-* `levels` is a `Uint8Array` holding the calculated [bidi embedding levels](https://unicode.org/reports/tr9/#BD2) for each character in the string. You'll pass this to other functions described below. The most important thing to know about these levels is that any given character is right-to-left if its embedding level is an odd number, and left-to-right if it's an even number.
+* `levels` is a `Uint8Array` holding the calculated [bidi embedding levels](https://unicode.org/reports/tr9/#BD2) for each character in the string. The most important thing to know about these levels is that any given character is in a right-to-left scope if its embedding level is an odd number, and left-to-right if it's an even number.
 
 * `paragraphs` is an array of `{start, end, level}` objects, one for each paragraph in the text (paragraphs are separated by explicit breaking characters, not soft line wrapping). The `start` and `end` indices are inclusive, and `level` is the resolved base embedding level of that paragraph.
 
