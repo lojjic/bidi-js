@@ -10,11 +10,14 @@
   },
   "scripts": {
     "build": "rollup -c rollup.config.js",
-    "test": "node test/index.js"
+    "test": "npx babel-node --plugins @babel/plugin-transform-modules-commonjs test/index.js"
   },
   "author": "Jason Johnston",
   "license": "MIT",
   "devDependencies": {
+    "@babel/core": "^7.13.16",
+    "@babel/node": "^7.13.13",
+    "@babel/plugin-transform-modules-commonjs": "^7.13.8",
     "node-fetch": "^2.6.1",
     "rollup": "^2.45.1",
     "rollup-plugin-terser": "^7.0.2"

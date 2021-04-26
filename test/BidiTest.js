@@ -1,9 +1,10 @@
 import { getEmbeddingLevels, getReorderedIndices } from '../src/index.js'
 import { readFileSync } from 'fs'
+import path from 'path'
 import { performance } from 'perf_hooks'
 
 export function runBidiTest () {
-  const text = readFileSync(new URL('./BidiTest.txt', import.meta.url), 'utf-8')
+  const text = readFileSync(path.join(__dirname, './BidiTest.txt'), 'utf-8')
   let lines = text.split('\n')
 
   const BAIL_COUNT = 10

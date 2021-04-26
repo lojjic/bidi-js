@@ -1,10 +1,11 @@
 import { getEmbeddingLevels, getReorderedIndices } from '../src/index.js'
 import { getBidiCharType, TYPES_TO_NAMES } from '../src/charTypes.js'
 import { readFileSync } from 'fs'
+import path from 'path'
 import { performance } from 'perf_hooks'
 
 export function runBidiCharacterTest () {
-  const text = readFileSync(new URL('./BidiCharacterTest.txt', import.meta.url), 'utf-8')
+  const text = readFileSync(path.join(__dirname, './BidiCharacterTest.txt'), 'utf-8')
   const lines = text.split('\n')
 
   const BAIL_COUNT = 10
