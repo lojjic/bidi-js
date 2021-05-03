@@ -1,10 +1,8 @@
-import { getEmbeddingLevels, getReorderedIndices } from '../src/index.js'
-import { getBidiCharType, TYPES_TO_NAMES } from '../src/charTypes.js'
-import { readFileSync } from 'fs'
-import path from 'path'
-import { performance } from 'perf_hooks'
+const { readFileSync } = require('fs')
+const path = require('path')
+const { performance } = require('perf_hooks')
 
-export function runBidiCharacterTest () {
+module.exports.runBidiCharacterTest = function (bidi) {
   const text = readFileSync(path.join(__dirname, './BidiCharacterTest.txt'), 'utf-8')
   const lines = text.split('\n')
 
@@ -32,9 +30,9 @@ export function runBidiCharacterTest () {
       expectedOrder = expectedOrder.split(' ').map(s => parseInt(s, 10))
 
       const start = performance.now()
-      const embedLevelsResult = getEmbeddingLevels(input, paraDir)
+      const embedLevelsResult = bidi.getEmbeddingLevels(input, paraDir)
       const {levels, paragraphs} = embedLevelsResult
-      let reordered = getReorderedIndices(input, embedLevelsResult)
+      let reordered = bidi.getReorderedIndices(input, embedLevelsResult)
       totalTime += performance.now() - start
 
       reordered = reordered.filter(i => expectedLevels[i] !== 'x') //those with indeterminate level are ommitted
@@ -62,7 +60,7 @@ export function runBidiCharacterTest () {
         passCount++
       } else {
         if (++failCount <= BAIL_COUNT) {
-          const types = input.split('').map(ch => TYPES_TO_NAMES[getBidiCharType(ch)])
+          const types = input.split('').map(ch => bidi.getBidiCharTypeName(ch))
           console.error(`Test on line ${lineIdx + 1}, direction "${paraDir}":
   Input codes:     ${inputOrig}
   Input Types:     ${mapToColumns(types, 5)}

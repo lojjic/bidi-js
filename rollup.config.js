@@ -1,4 +1,5 @@
 import { terser } from 'rollup-plugin-terser'
+import buble from '@rollup/plugin-buble'
 
 export default [
   // First compile to an iife, and wrap the whole thing into an exported factory function.
@@ -11,7 +12,13 @@ export default [
       name: 'bidi',
       banner: `export default function bidiFactory() {`,
       footer: `return bidi}`
-    }
+    },
+    plugins: [
+      // Transpile down to ES5 for all build artifacts. This helps ensure that downstream
+      // transpilers won't inject references to external helpers/polyfills, which would
+      // break its ability to be serialized to a web worker.
+      buble()
+    ]
   },
   // Then wrap that exported factory function as esm and umd
   {

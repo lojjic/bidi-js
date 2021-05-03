@@ -1,9 +1,8 @@
-import { getEmbeddingLevels, getReorderedIndices } from '../src/index.js'
-import { readFileSync } from 'fs'
-import path from 'path'
-import { performance } from 'perf_hooks'
+const { readFileSync } = require('fs')
+const path = require('path')
+const { performance } = require('perf_hooks')
 
-export function runBidiTest () {
+module.exports.runBidiTest = function (bidi) {
   const text = readFileSync(path.join(__dirname, './BidiTest.txt'), 'utf-8')
   let lines = text.split('\n')
 
@@ -73,9 +72,9 @@ export function runBidiTest () {
         if (testFilter && testFilter(lineIdx + 1, paraDir) === false) continue
 
         const start = performance.now()
-        const embedLevelsResult = getEmbeddingLevels(inputString, paraDir)
+        const embedLevelsResult = bidi.getEmbeddingLevels(inputString, paraDir)
         const {levels, paragraphs} = embedLevelsResult
-        let reordered = getReorderedIndices(inputString, embedLevelsResult)
+        let reordered = bidi.getReorderedIndices(inputString, embedLevelsResult)
         totalTime += performance.now() - start
         reordered = reordered.filter(i => expectedLevels[i] !== 'x') //those with indeterminate level are ommitted
 
