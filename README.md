@@ -13,7 +13,7 @@ This implementation currently conforms to section [UAX-C1](https://unicode.org/r
 
 ## Compatibility
 
-It has no external dependencies and therefore should run just fine in any relatively capable web browser, Node.js, etc. The provided distribution `.js` files are valid ES2015, and can be down-compiled using Babel or similar if needed.
+It has no external dependencies and therefore should run just fine in any relatively capable web browser, Node.js, etc. The provided distribution `.js` files are valid ES5.
 
 ## Usage
 
