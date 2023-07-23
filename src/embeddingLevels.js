@@ -325,6 +325,12 @@ export function getEmbeddingLevels (string, baseDirection) {
     // The next steps are done per isolating run sequence
     for (let seqIdx = 0; seqIdx < isolatingRunSeqs.length; seqIdx++) {
       const { _seqIndices: seqIndices, _sosType: sosType, _eosType: eosType } = isolatingRunSeqs[seqIdx]
+      /**
+       * All the level runs in an isolating run sequence have the same embedding level.
+       * 
+       * DO NOT change any `embedLevels[i]` within the current scope.
+       */
+      const embedDirection = ((embedLevels[seqIndices[0]]) & 1) ? TYPE_R : TYPE_L;
 
       // === 3.3.4 Resolving Weak Types ===
 
@@ -510,7 +516,7 @@ export function getEmbeddingLevels (string, baseDirection) {
             if (charTypes[i] & STRONG_TYPES_FOR_N_STEPS) {
               foundStrongType = true
               const lr = (charTypes[i] & R_TYPES_FOR_N_STEPS) ? TYPE_R : TYPE_L
-              if (lr === getEmbedDirection(i)) {
+              if (lr === embedDirection) {
                 useStrongType = lr
                 break
               }
@@ -528,10 +534,10 @@ export function getEmbeddingLevels (string, baseDirection) {
               const i = seqIndices[si]
               if (charTypes[i] & STRONG_TYPES_FOR_N_STEPS) {
                 const lr = (charTypes[i] & R_TYPES_FOR_N_STEPS) ? TYPE_R : TYPE_L
-                if (lr !== getEmbedDirection(i)) {
+                if (lr !== embedDirection) {
                   useStrongType = lr
                 } else {
-                  useStrongType = getEmbedDirection(i)
+                  useStrongType = embedDirection
                 }
                 break
               }
@@ -542,7 +548,7 @@ export function getEmbeddingLevels (string, baseDirection) {
             // * Any number of characters that had original bidirectional character type NSM prior to the application
             // of W1 that immediately follow a paired bracket which changed to L or R under N0 should change to match
             // the type of their preceding bracket.
-            if (useStrongType !== getEmbedDirection(seqIndices[openSeqIdx])) {
+            if (useStrongType !== embedDirection) {
               for (let si = openSeqIdx + 1; si < seqIndices.length; si++) {
                 if (!(charTypes[seqIndices[si]] & BN_LIKE_TYPES)) {
                   if (getBidiCharType(string[seqIndices[si]]) & TYPE_NSM) {
@@ -552,7 +558,7 @@ export function getEmbeddingLevels (string, baseDirection) {
                 }
               }
             }
-            if (useStrongType !== getEmbedDirection(seqIndices[closeSeqIdx])) {
+            if (useStrongType !== embedDirection) {
               for (let si = closeSeqIdx + 1; si < seqIndices.length; si++) {
                 if (!(charTypes[seqIndices[si]] & BN_LIKE_TYPES)) {
                   if (getBidiCharType(string[seqIndices[si]]) & TYPE_NSM) {
@@ -590,7 +596,7 @@ export function getEmbeddingLevels (string, baseDirection) {
               }
             }
             for (let sj = niRunStart; sj <= niRunEnd; sj++) {
-              charTypes[seqIndices[sj]] = prevType === nextType ? prevType : getEmbedDirection(seqIndices[sj])
+              charTypes[seqIndices[sj]] = prevType === nextType ? prevType : embedDirection
             }
             si = niRunEnd
           }
@@ -679,9 +685,4 @@ export function getEmbeddingLevels (string, baseDirection) {
     }
     return -1
   }
-
-  function getEmbedDirection (i) {
-    return (embedLevels[i] & 1) ? TYPE_R : TYPE_L
-  }
-
 }
