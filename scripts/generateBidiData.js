@@ -16,7 +16,7 @@ async function generateBidiCharTypesData() {
   const txt = await response.text()
   const classMap = new Map()
   txt.split('\n').forEach(line => {
-    line.trim()
+    line = line.trim()
     if (!line || line.startsWith('#')) return
     const match = line.match(/^([A-Z0-9.]+)\s*;\s([\w]+)*/)
     if (match) {
@@ -86,7 +86,7 @@ async function generateBracketsData() {
   let pairs = new Map()
   let reversePairs = new Map()
   txt.split('\n').forEach(line => {
-    line.trim()
+    line = line.trim()
     if (!line || line.startsWith('#')) return
     const match = line.match(/^([A-Z0-9.]+)\s*;\s*([A-Z0-9.]+)\s*;\s*o/)
     if (match) {
@@ -136,7 +136,7 @@ async function generateMirroringData() {
   let pairs = new Map()
   let reversePairs = new Map()
   txt.split('\n').forEach(line => {
-    line.trim()
+    line = line.trim()
     if (!line || line.startsWith('#')) return
     const match = line.match(/^([A-Z0-9.]+)\s*;\s*([A-Z0-9.]+)\s*/)
     if (match) {
