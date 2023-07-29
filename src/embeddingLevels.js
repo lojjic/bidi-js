@@ -410,8 +410,10 @@ export function getEmbeddingLevels (string, baseDirection) {
             for (let sj = si - 1; sj >= 0 && (charTypes[seqIndices[sj]] & (TYPE_ET | BN_LIKE_TYPES)); sj--) {
               changeCharType(seqIndices[sj], TYPE_EN)
             }
-            for (let sj = si + 1; sj < seqIndices.length && (charTypes[seqIndices[sj]] & (TYPE_ET | BN_LIKE_TYPES)); sj++) {
-              changeCharType(seqIndices[sj], TYPE_EN)
+            for (si++; si < seqIndices.length && (charTypes[seqIndices[si]] & (TYPE_ET | BN_LIKE_TYPES | TYPE_EN)); si++) {
+              if (charTypes[seqIndices[si]] !== TYPE_EN) {
+                changeCharType(seqIndices[si], TYPE_EN)
+              }
             }
           }
         }
