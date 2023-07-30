@@ -46,7 +46,7 @@ export function getReorderSegments(string, embeddingLevelsResult, start, end) {
               i++
             }
             if (i > segStart) {
-              segments.push([segStart + start, i + start])
+              segments.push([segStart + lineStart, i + lineStart])
             }
           }
         }
