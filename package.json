@@ -1,6 +1,6 @@
 {
   "name": "bidi-js",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A JavaScript implementation of the Unicode Bidirectional Algorithm",
   "main": "dist/bidi.js",
   "module": "dist/bidi.mjs",
