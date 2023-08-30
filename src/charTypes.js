@@ -22,18 +22,39 @@ function parseData () {
   if (!map) {
     //const start = performance.now()
     map = new Map()
-    for (let type in DATA) {
+    let start = 0;
+    for (const type in DATA) {
       if (DATA.hasOwnProperty(type)) {
-        let lastCode = 0
-        DATA[type].split(',').forEach(range => {
-          let [skip, step] = range.split('+')
-          skip = parseInt(skip, 36)
-          step = step ? parseInt(step, 36) : 0
-          map.set(lastCode += skip, TYPES[type])
-          for (let i = 0; i < step; i++) {
-            map.set(++lastCode, TYPES[type])
+        const segments = DATA[type];
+        let temp = '';
+        let end;
+        let state = false;
+        let lastCode = 0;
+        for (let i = 0; i <= segments.length + 1; i += 1) {
+          const char = segments[i];
+          if (char !== ',' && i !== segments.length) {
+            if (char === '+') {
+              state = true;
+              lastCode = start = lastCode + parseInt(temp, 36);
+              temp = '';
+            } else {
+              temp += char;
+            }
+          } else {
+            if (!state) {
+              lastCode = start = lastCode + parseInt(temp, 36);
+              end = start;
+            } else {
+              end = start + parseInt(temp, 36);
+            }
+            state = false;
+            temp = '';
+            lastCode = end;
+            for (let j = start; j < end + 1; j += 1) {
+              map.set(j, TYPES[type]);
+            }
           }
-        })
+        }
       }
     }
     //console.log(`char types parsed in ${performance.now() - start}ms`)
