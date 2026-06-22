@@ -16,6 +16,11 @@ function parse () {
   }
 }
 
+/**
+ * Get the mirrored character for a given character, if one exists.
+ * @param {string} char
+ * @return {string|null}
+ */
 export function getMirroredCharacter (char) {
   parse()
   return mirrorMap.get(char) || null
@@ -24,10 +29,10 @@ export function getMirroredCharacter (char) {
 /**
  * Given a string and its resolved embedding levels, build a map of indices to replacement chars
  * for any characters in right-to-left segments that have defined mirrored characters.
- * @param string
- * @param embeddingLevels
- * @param [start]
- * @param [end]
+ * @param {string} string
+ * @param {Uint8Array} embeddingLevels
+ * @param {number?} [start]
+ * @param {number?} [end]
  * @return {Map<number, string>}
  */
 export function getMirroredCharactersMap(string, embeddingLevels, start, end) {

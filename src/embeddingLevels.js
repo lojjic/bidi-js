@@ -37,7 +37,7 @@ const {
 
 /**
  * @typedef {object} GetEmbeddingLevelsResult
- * @property {{start, end, level}[]} paragraphs
+ * @property {{start: number, end: number, level: number}[]} paragraphs
  * @property {Uint8Array} levels
  */
 
