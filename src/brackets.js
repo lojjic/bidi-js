@@ -14,16 +14,31 @@ function parse () {
   }
 }
 
+/**
+ * Get the opening bracket character corresponding to a given closing bracket character.
+ * @param {string} char
+ * @returns {string | null}
+ */
 export function openingToClosingBracket (char) {
   parse()
   return openToClose.get(char) || null
 }
 
+/**
+ * Get the closing bracket character corresponding to a given opening bracket character.
+ * @param {string} char
+ * @returns {string | null}
+ */
 export function closingToOpeningBracket (char) {
   parse()
   return closeToOpen.get(char) || null
 }
 
+/**
+ * Retrieves the canonical form of a bracket character.
+ * @param {string} char
+ * @returns {string | null}
+ */
 export function getCanonicalBracket (char) {
   parse()
   return canonical.get(char) || null

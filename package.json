@@ -4,6 +4,7 @@
   "description": "A JavaScript implementation of the Unicode Bidirectional Algorithm",
   "main": "dist/bidi.js",
   "module": "dist/bidi.mjs",
+  "types": "src/bidi.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/lojjic/bidi-js.git"

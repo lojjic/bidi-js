@@ -70,6 +70,11 @@ function getBidiCharType (char) {
   return map.get(char.codePointAt(0)) || TYPES.L
 }
 
+/**
+ * Get Bidi Character Type Name
+ * @param {string} char
+ * @returns { "L" | "R" | "EN" | "ES" | "ET" | "AN" | "CS" | "B" | "S" | "WS" | "ON" | "BN" | "NSM" | "AL" | "LRO" | "RLO" | "LRE" | "RLE" | "PDF" | "LRI" | "RLI" | "FSI" | "PDI" }
+ */
 function getBidiCharTypeName(char) {
   return TYPES_TO_NAMES[getBidiCharType(char)]
 }
