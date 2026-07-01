@@ -1,13 +1,16 @@
-import { runBidiTest } from './BidiTest.js'
-import { runBidiCharacterTest } from './BidiCharacterTest.js'
-
-import * as bidiFromSrc from '../src/index.js'
+import * as bidiFactory from '../src/index.js'
+const { runBidiCharacterTest } = require('./BidiCharacterTest.js')
+const { runBidiMultibyteCharacterTest } = require('./BidiMultibyteCharacterTest.js')
+const { runBidiTest } = require('./BidiTest.js')
 
 console.log('Running test suite on src files...')
 
-const results = [
-  runBidiTest(bidiFromSrc),
-  runBidiCharacterTest(bidiFromSrc)
-]
+const bidi = bidiFactory
+let failures = 0
+const bidiInstance = bidiFactory.getEmbeddingLevels ? bidiFactory : bidiFactory()
 
-process.exit(Math.max(...results))
+failures += runBidiTest(bidiInstance)
+failures += runBidiCharacterTest(bidiInstance)
+failures += runBidiMultibyteCharacterTest(bidiInstance)
+
+process.exit(failures)

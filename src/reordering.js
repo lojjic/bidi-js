@@ -25,12 +25,32 @@ export function getReorderSegments(string, embeddingLevelsResult, start, end) {
 
       // 3.4 L1.4: Reset any sequence of whitespace characters and/or isolate formatting characters at the
       // end of the line to the paragraph level.
-      for (let i = lineEnd; i >= lineStart && (getBidiCharType(string[i]) & TRAILING_TYPES); i--) {
-        lineLevels[i] = paragraph.level
+      // Iterate backwards by code unit index
+      let i = lineEnd;
+      while (i >= lineStart) {
+        // Get the full character starting at index i
+        const codePoint = string.codePointAt(i);
+        const char = String.fromCodePoint(codePoint);
+        const charLen = char.length; // 1 or 2
+
+        // Check the type of the character
+        if (getBidiCharType(char) & TRAILING_TYPES) {
+          // It's a trailing type, reset level(s)
+          const levelIndex = i - lineStart;
+          lineLevels[levelIndex] = paragraph.level;
+          if (charLen === 2 && i > lineStart) {
+             // If it was a surrogate pair, reset the level for the high surrogate too
+             lineLevels[levelIndex - 1] = paragraph.level;
+          }
+          // Move index back by character length
+          i -= charLen;
+        } else {
+          // Not a trailing type, stop scanning
+          break;
+        }
       }
 
       // L2. From the highest level found in the text to the lowest odd level on each line, including intermediate levels
-      // not actually present in the text, reverse any contiguous sequence of characters that are at that level or higher.
       let maxLevel = paragraph.level
       let minOddLevel = Infinity
       for (let i = 0; i < lineLevels.length; i++) {
