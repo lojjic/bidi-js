@@ -7,7 +7,7 @@
   "types": "src/bidi.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lojjic/bidi-js.git"
+    "url": "git+https://github.com/lojjic/bidi-js.git"
   },
   "scripts": {
     "build": "rollup -c rollup.config.js",
