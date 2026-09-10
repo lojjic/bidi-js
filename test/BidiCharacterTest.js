@@ -86,6 +86,7 @@ module.exports.runBidiCharacterTest = function (bidi) {
   return failCount ? 1 : 0
 }
 
+// Helper function to format output
 function mapToColumns (values, colSize) {
   return [...values].map(v => `${v}`.padEnd(colSize)).join('')
 }

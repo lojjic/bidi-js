@@ -35,18 +35,28 @@ export function getMirroredCharacter (char) {
  * @param {number?} [end]
  * @return {Map<number, string>}
  */
-export function getMirroredCharactersMap(string, embeddingLevels, start, end) {
+export function getMirroredCharactersMap(string, {levels: embeddingLevels}, start, end) {
   let strLen = string.length
   start = Math.max(0, start == null ? 0 : +start)
   end = Math.min(strLen - 1, end == null ? strLen - 1 : +end)
 
   const map = new Map()
-  for (let i = start; i <= end; i++) {
+  // Iterate by code unit index i
+  for (let i = start; i <= end; /* i is advanced in loop */) {
+    // Check level using code unit index i
     if (embeddingLevels[i] & 1) { //only odd (rtl) levels
-      const mirror = getMirroredCharacter(string[i])
+      // Get character using code point
+      const codePoint = string.codePointAt(i);
+      const char = String.fromCodePoint(codePoint);
+      const mirror = getMirroredCharacter(char) // Use full character
       if (mirror !== null) {
-        map.set(i, mirror)
+        map.set(i, mirror) // Map using code unit index i
       }
+      // Advance index by character length (1 or 2)
+      i += char.length;
+    } else {
+      // Level is not RTL, advance by 1 code unit
+      i++;
     }
   }
   return map
